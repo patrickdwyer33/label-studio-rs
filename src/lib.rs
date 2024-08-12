@@ -121,7 +121,7 @@ struct PredictionData {
     start: String,
     end: String,
     // instant: bool,
-    // timeserieslabels: Vec<String>,
+    timeserieslabels: Vec<String>,
 }
 
 #[derive(serde::Deserialize, Debug, Clone)]
@@ -129,7 +129,7 @@ struct AnnotationData {
     start: u32,
     end: u32,
     // instant: bool,
-    // timeserieslabels: Vec<String>,
+    timeserieslabels: Vec<String>,
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -279,17 +279,21 @@ async fn get_all_project_data(
     Ok(out_project_map)
 }
 
-fn get_relevant_data(task: &TaskData) -> (Vec<u32>, Vec<u32>, Vec<String>, Vec<String>) {
+fn get_relevant_data(task: &TaskData, project_name: &str) -> (Vec<u32>, Vec<u32>, Vec<String>, Vec<String>, Vec<String>, Vec<String>) {
     let mut markings_start: Vec<u32> = Vec::new();
     let mut markings_end: Vec<u32> = Vec::new();
     let mut methods: Vec<String> = Vec::new();
     let mut file_uploads: Vec<String> = Vec::new();
+    let mut project_names: Vec<String> = Vec::new();
+    let mut labels: Vec<String> = Vec::new();
     for annotation_set in task.annotations.iter() {
         for annotation in annotation_set.result.iter() {
             file_uploads.push(task.file_upload.clone());
             methods.push("manual".to_string());
             markings_start.push(annotation.value.start);
             markings_end.push(annotation.value.end);
+            project_names.push(project_name.to_string());
+            labels.push(annotation.value.timeserieslabels.join(" "))
         }
     }
     for prediction_set in task.predictions.iter() {
@@ -310,9 +314,11 @@ fn get_relevant_data(task: &TaskData) -> (Vec<u32>, Vec<u32>, Vec<String>, Vec<S
                     .parse::<u32>()
                     .expect("Should be a positive integer"),
             );
+            project_names.push(project_name.to_string());
+            labels.push(prediction.value.timeserieslabels.join(" "))
         }
     }
-    (markings_start, markings_end, methods, file_uploads)
+    (markings_start, markings_end, methods, file_uploads, project_names, labels)
 }
 
 fn build_df(projects_map: HashMap<String, ProjectData>) -> PolarsResult<DataFrame> {
@@ -320,18 +326,24 @@ fn build_df(projects_map: HashMap<String, ProjectData>) -> PolarsResult<DataFram
     let mut markings_end: Vec<u32> = Vec::new();
     let mut methods: Vec<String> = Vec::new();
     let mut file_uploads: Vec<String> = Vec::new();
-    for (_, data) in projects_map.iter() {
+    let mut project_names: Vec<String> = Vec::new();
+    let mut labels: Vec<String> = Vec::new();
+    for (name, data) in projects_map.iter() {
         for task_data in data.tasks.iter() {
             let (
                 mut new_markings_start,
                 mut new_markings_end,
                 mut new_methods,
                 mut new_file_uploads,
-            ) = get_relevant_data(task_data);
+                mut new_project_names,
+                mut new_labels
+            ) = get_relevant_data(task_data, name);
             markings_start.append(&mut new_markings_start);
             markings_end.append(&mut new_markings_end);
             methods.append(&mut new_methods);
             file_uploads.append(&mut new_file_uploads);
+            project_names.append(&mut new_project_names);
+            labels.append(&mut new_labels);
         }
     }
     df!(
@@ -339,6 +351,8 @@ fn build_df(projects_map: HashMap<String, ProjectData>) -> PolarsResult<DataFram
         "end" => markings_end,
         "method" => methods,
         "file_upload" => file_uploads,
+        "project" => project_names,
+        "labels" => labels,
     )
 }
 
