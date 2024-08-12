@@ -15,6 +15,8 @@ Currently the script supports outputting the following four columns:
 * `end` (integer)
 * `method` ("predicted" | "manual")
 * `file_upload` (string)
+* `project` (string)
+* `labels` (string), bar-seperated list of labels (from `timeserieslabels`)
 
 This can be changed by updating the `get_relevant_data` function, and you can save more data from the api to work with by un-commenting or adding fields in the structs defined after line `116`.
 

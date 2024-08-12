@@ -293,7 +293,7 @@ fn get_relevant_data(task: &TaskData, project_name: &str) -> (Vec<u32>, Vec<u32>
             markings_start.push(annotation.value.start);
             markings_end.push(annotation.value.end);
             project_names.push(project_name.to_string());
-            labels.push(annotation.value.timeserieslabels.join(" "))
+            labels.push(annotation.value.timeserieslabels.join("|"))
         }
     }
     for prediction_set in task.predictions.iter() {
@@ -315,7 +315,7 @@ fn get_relevant_data(task: &TaskData, project_name: &str) -> (Vec<u32>, Vec<u32>
                     .expect("Should be a positive integer"),
             );
             project_names.push(project_name.to_string());
-            labels.push(prediction.value.timeserieslabels.join(" "))
+            labels.push(prediction.value.timeserieslabels.join("|"))
         }
     }
     (markings_start, markings_end, methods, file_uploads, project_names, labels)
