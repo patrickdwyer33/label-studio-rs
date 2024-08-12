@@ -1,7 +1,6 @@
-// use polars::prelude::*;
+use lable_studio_rs::Config;
 use std::env;
 use std::error::Error;
-use lable_studio_rs::Config;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
