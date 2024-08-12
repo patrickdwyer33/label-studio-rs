@@ -3,23 +3,34 @@ use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::env;
 
-struct Config {
+pub struct Config {
     api_token: String,
     host_name: String,
-    project_names: Hashset<String>,
+    project_names: HashSet<String>,
 }
+
+type ProjectName = String;
+type ProjectId = u32;
 
 const PROJECT_NAMES_ENV_VAR_NAME: &'static str = "LSRS_PROJECT_NAMES";
 const HOST_NAME_ENV_VAR_NAME: &'static str = "LSRS_HOST_NAME";
 const API_TOKEN_ENV_VAR_NAME: &'static str = "LSRS_API_TOKEN";
 
 impl Config {
-    fn build(args: &mut Vec<String>) -> Config {
-        let Some(project_names_string) = Config::get_arg(args, PROJECT_NAMES_ENV_VAR_NAME) else {return Err(format!("Please pass project_names list as string (see README) as either last command line arg or as an environment variable {}", PROJECT_NAMES_ENV_VAR_NAME))};
-        let Some(host_name) = Config::get_arg(args, HOST_NAME_ENV_VAR_NAME) else {return Err(format!("Please pass host_name as string (see README) as either last command line arg or as an environment variable {}", HOST_NAME_ENV_VAR_NAME))};
-        let Some(api_token) = Config::get_arg(args, API_TOKEN_ENV_VAR_NAME) else {return Err(format!("Please pass api_token as string (see README) as either last command line arg or as an environment variable {}", API_TOKEN_ENV_VAR_NAME))};
-        
+    pub fn build(args: &mut Vec<String>) -> Result<Config, Box<dyn Error>> {
+        let Some(project_names_string) = Config::get_arg(args, PROJECT_NAMES_ENV_VAR_NAME) else {return Err(format!("Please pass project_names list as string (see README) as either last command line arg or as an environment variable {}", PROJECT_NAMES_ENV_VAR_NAME).into())};
+        let Some(host_name) = Config::get_arg(args, HOST_NAME_ENV_VAR_NAME) else {return Err(format!("Please pass host_name as string (see README) as either last command line arg or as an environment variable {}", HOST_NAME_ENV_VAR_NAME).into())};
+        let Some(api_token) = Config::get_arg(args, API_TOKEN_ENV_VAR_NAME) else {return Err(format!("Please pass api_token as string (see README) as either last command line arg or as an environment variable {}", API_TOKEN_ENV_VAR_NAME).into())};
+        let project_names = Config::parse_project_names(project_names_string);
+        Ok(Config {
+            api_token,
+            host_name,
+            project_names
+        })
+    }
 
+    fn parse_project_names(project_names_string: String) -> HashSet<ProjectName> {
+        HashSet::<ProjectName>::from_iter(project_names_string.split(",").map(|s| s.to_string()))
     }
 
     // Returns env var if it is set else pops the last value from args
@@ -32,8 +43,6 @@ impl Config {
     }
 }
 
-type ProjectName = &'static str;
-type ProjectId = u32;
 
 fn get_project_info(
     json_result: &serde_json::Map<String, serde_json::Value>,
@@ -52,7 +61,7 @@ fn get_project_info(
             return Err("Expected project id in projects_info json to be a number".into());
         };
         Ok((
-            const_title_ref,
+            (*const_title_ref).clone(),
             id.as_u64().expect("The id should be a small integer") as u32,
         ))
     } else {
@@ -254,7 +263,14 @@ async fn get_all_project_data(
     let mut out_project_map = HashMap::new();
     for (name, id) in project_map.iter() {
         let project_data = get_project_data(api_token, client, id, host_name).await?;
-        out_project_map.insert(*name, project_data);
+        out_project_map.insert((*name).to_string(), project_data);
     }
     Ok(out_project_map)
+}
+
+pub async fn run(config: Config) -> Result<(), Box<dyn Error>> {
+    let client = reqwest::Client::new();
+    let projects_map = get_projects_hashmap(&config.api_token, &client, config.project_names, &config.host_name).await?;
+    let projects_map = get_all_project_data(&config.api_token, &client, projects_map, &config.host_name).await?;
+    Ok(())
 }
